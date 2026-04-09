@@ -2,14 +2,22 @@
   "name": "segunda-tela-pdv",
   "version": "1.0.0",
   "description": "Sistema de Customer Facing Display para PDV",
-  "main": "server.js",
+  "main": "electron.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev:electron": "electron .",
+    "build": "electron-packager . \"CFD PDV\" --platform=win32 --arch=x64 --out=dist_final --overwrite --asar --extra-resource=config.json"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "node-firebird": "^1.1.6",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "multer": "^2.1.1",
+    "node-firebird": "^1.1.6"
+  },
+  "devDependencies": {
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "electron-packager": "^17.1.2"
   }
 }

@@ -1,83 +1,107 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Facing Display - PDV</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=1.1">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .transition-opacity { transition: opacity 0.5s ease-in-out; }
+        .carousel-img {
+            transition: opacity 1s ease-in-out;
+        }
     </style>
 </head>
-<body class="bg-gray-100 overflow-hidden h-screen">
 
-    <!-- Tela de Configuração -->
-    <div id="config-screen" class="hidden h-full flex items-center justify-center p-6">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Configuração do Banco</h2>
-            <form id="config-form" class="space-y-4">
+<body class="bg-slate-950">
+
+    <!-- Tela de Carrossel (Standby) -->
+    <div id="screen-standby" class="screen flex items-center justify-center bg-black overflow-hidden">
+        <div id="carousel-container" class="relative w-full h-full">
+            <!-- Imagens injetadas via JS -->
+        </div>
+    </div>
+
+    <!-- Tela de Venda Ativa -->
+    <div id="screen-venda" class="screen hidden grid grid-cols-12 h-screen overflow-hidden">
+        <!-- Lado Esquerdo: Itens -->
+        <div class="col-span-8 flex flex-col h-full overflow-hidden bg-list-custom border-r border-slate-800">
+            <div class="table-header flex justify-between px-8 py-8 bg-secondary-custom">
+                <span class="w-1/2 text-2xl font-black uppercase">Descrição do Produto</span>
+                <span class="w-1/6 text-center text-2xl font-black uppercase">Qtd</span>
+                <span class="w-1/6 text-right text-2xl font-black uppercase">Unitário</span>
+                <span class="w-1/6 text-right text-2xl font-black uppercase">Total</span>
+            </div>
+            <div id="items-list" class="flex-1 w-full overflow-y-auto item-scroll px-0">
+                <!-- Itens injetados via JS preencherão toda a largura -->
+            </div>
+        </div>
+
+        <!-- Lado Direito: Logo e Total -->
+        <div class="col-span-4 flex flex-col h-full overflow-hidden bg-side-custom p-8 justify-between">
+            <div class="flex flex-col items-center">
+                <div class="w-full h-80 flex items-center justify-center bg-white/5 rounded-md p-3 mb-5">
+                    <img id="logo-img" src="/logo.png" class="max-w-full max-h-full "
+                        onerror="this.src='https://via.placeholder.com/300?text=LOGO'">
+                </div>
+                <div class="text-center w-full border-t border-slate-800 pt-3">
+                    <p id="store-name" class="text-accent-custom text-2xl font-black uppercase mb-1">---</p>
+
+                </div>
+            </div>
+
+            <div class="bg-primary-custom rounded-md p-8 border border-white/10 shadow-2xl">
+                <p class="text-gray-400 font-bold uppercase text-lg tracking-widest mb-4">Total a Pagar</p>
+                <div id="total-venda"
+                    class="text-6xl lg:text-7xl font-[900] text-total-custom tracking-tighter truncate">
+                    R$ 0,00
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela de Agradecimento (Modal/Overlay) -->
+    <div id="screen-obrigado" class="screen hidden flex items-center justify-center z-50 bg-slate-950/95">
+        <div class="text-center space-y-8 animate-pulse">
+            <div class="inline-block p-10 rounded-md border-4 border-accent-custom bg-accent-custom/5">
+                <h1 class="text-8xl font-black text-white px-20">OBRIGADO!</h1>
+                <p class="text-3xl text-accent-custom font-bold uppercase mt-6 tracking-[0.4em]">Pela preferência</p>
+            </div>
+            <p class="text-slate-500 text-xl font-medium italic">Seu atendimento foi concluído com sucesso.</p>
+        </div>
+    </div>
+
+    <!-- Tela de Configuração Inicial -->
+    <div id="screen-config" class="screen hidden flex items-center justify-center bg-slate-950">
+        <div class="bg-slate-900 p-12 rounded-md border border-slate-800 w-full max-w-xl shadow-2xl">
+            <h2 class="text-3xl font-black mb-8 border-b border-slate-800 pb-4">CONFIGURAÇÃO CFD</h2>
+            <form id="config-form" class="space-y-6">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-600">Servidor (Host)</label>
-                    <input type="text" id="db-host" placeholder="localhost" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-2">Caminho do Banco de
+                        Dados</label>
+                    <input type="text" id="db-path"
+                        class="w-full bg-black/50 border border-slate-700 p-4 rounded-sm outline-none focus:border-accent-custom transition-all"
+                        placeholder="C:\ACS\DADOS.fdb">
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-600">Caminho do Banco (.fdb)</label>
-                    <input type="text" id="db-path" placeholder="C:\ACS\DADOS.fdb" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-600">Usuário</label>
-                        <input type="text" id="db-user" placeholder="SYSDBA" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-600">Senha</label>
-                        <input type="password" id="db-pass" placeholder="masterkey" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors">
-                    Salvar e Testar Conexão
+                <button type="submit"
+                    class="w-full bg-accent-custom hover:opacity-90 text-white font-black py-5 rounded-sm text-xl transition-all">
+                    SALVAR E CONECTAR
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- Tela de Venda Ativa -->
-    <div id="sale-screen" class="hidden h-full grid grid-cols-12">
-        <!-- Lado Esquerdo: Itens -->
-        <div class="col-span-8 bg-white flex flex-col h-full shadow-lg">
-            <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
-                <h2 class="text-3xl font-extrabold text-blue-900">Itens da Compra</h2>
-                <span id="item-count" class="bg-blue-100 text-blue-800 px-4 py-1 rounded-full text-lg font-bold">0 itens</span>
-            </div>
-            <div id="items-list" class="flex-1 overflow-y-auto p-6 space-y-4">
-                <!-- Itens injetados via JS -->
-            </div>
-        </div>
+    <!-- Botão Secreto para Configurações (Fica semi-transparente no canto) -->
+    <a href="/admin.html" class="fixed bottom-4 right-4 text-white/5 hover:text-white/80 transition-all z-[100]" title="Abrir Configurações">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    </a>
 
-        <!-- Lado Direito: Logo e Total -->
-        <div class="col-span-4 bg-gradient-to-br from-blue-700 to-indigo-900 text-white flex flex-col h-full">
-            <div class="p-8 flex justify-center items-start flex-1">
-                <div id="logo-container" class="w-full h-48 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">
-                    <img src="/logo.png" alt="Logo" class="max-h-32 object-contain" onerror="this.src='https://via.placeholder.com/300x150?text=Sua+Logo+Aqui'">
-                </div>
-            </div>
-            <div class="p-8 bg-black/20 backdrop-blur-lg">
-                <p class="text-2xl font-semibold opacity-70 uppercase tracking-wider">Total a Pagar</p>
-                <div id="total-value" class="text-7xl font-black mt-2">R$ 0,00</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tela de Promoções (Idle) -->
-    <div id="idle-screen" class="hidden h-full w-full relative bg-black">
-        <div id="promo-carousel" class="w-full h-full">
-            <!-- Imagens injetadas via JS -->
-        </div>
-        <div class="absolute bottom-10 left-0 right-0 flex justify-center space-x-2" id="carousel-indicators"></div>
-    </div>
-
-    <script src="app.js"></script>
+    <script src="js/app.js?v=1.2"></script>
 </body>
+
 </html>

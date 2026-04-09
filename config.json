@@ -1,0 +1,19 @@
+{
+  "db": {
+    "host": "localhost",
+    "port": "3050",
+    "database": "C:\\ACS\\SINTESE\\PDV\\CAIXA.fdb",
+    "user": "SYSDBA",
+    "password": "masterkey",
+    "store_name": "POSTO CEARA 10"
+  },
+  "colors": {
+    "bg_list": "#003d0a",
+    "bg_side": "#110070",
+    "primary": "#0044cc",
+    "secondary": "#007a2f",
+    "accent": "#fedf00",
+    "text": "#000000",
+    "text_total": "#009c3b"
+  }
+}

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CFD Admin - Painel de Controle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .tab-active { @apply bg-blue-600 text-white shadow-lg; }
+        .tab-inactive { @apply hover:bg-white/5 text-gray-400; }
+        .rounded-corp { border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-4xl font-black tracking-tight">Painel Administrativo</h1>
+                <p class="text-gray-400 font-medium">Customer Facing Display - Configurações Gerais</p>
+            </div>
+            <a href="/" target="_blank" class="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-corp font-bold transition-all flex items-center gap-2">
+                VER DISPlAY
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 v-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+            </a>
+        </header>
+
+        <div class="grid grid-cols-12 gap-8">
+            <nav class="col-span-12 md:col-span-3 space-y-2">
+                <button onclick="switchTab('db')" id="btn-db" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-active">BANCO DE DADOS</button>
+                <button onclick="switchTab('images')" id="btn-images" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-inactive">IMAGENS (LOGO/PROMO)</button>
+                <button onclick="switchTab('colors')" id="btn-colors" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-inactive">IDENTIDADE VISUAL</button>
+            </nav>
+
+            <main class="col-span-12 md:col-span-9 glass rounded-corp p-8 md:p-12 relative min-h-[600px]">
+                
+                <section id="tab-db">
+                    <h2 class="text-3xl font-black mb-6">Configuração Geral</h2>
+                    <form id="db-form" class="space-y-6">
+                        <div class="space-y-2">
+                            <label class="text-xs font-black uppercase text-gray-500">Nome da Empresa (Exibido no CFD)</label>
+                            <input type="text" name="store_name" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500 text-xl font-bold">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-xs font-black uppercase text-gray-500">Servidor (Host)</label>
+                                <input type="text" name="host" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black uppercase text-gray-500">Porta</label>
+                                <input type="number" name="port" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-black uppercase text-gray-500">Caminho do Banco (.fdb)</label>
+                            <input type="text" name="database" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-xs font-black uppercase text-gray-500">Usuário</label>
+                                <input type="text" name="user" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black uppercase text-gray-500">Senha</label>
+                                <input type="password" name="password" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-corp font-black">SALVAR CONFIGURAÇÕES</button>
+                    </form>
+                </section>
+
+                <section id="tab-images" class="hidden">
+                    <h2 class="text-3xl font-black mb-10">Logo e Promoções</h2>
+                    <div class="p-8 border border-white/10 bg-white/5 rounded-corp mb-10">
+                        <h3 class="text-xl font-bold mb-4">Logo do Estabelecimento</h3>
+                        <div class="flex items-center gap-8">
+                            <div class="w-40 h-40 bg-black rounded-corp border border-white/10 flex items-center justify-center p-2">
+                                <img id="logo-preview" src="/logo.png" class="max-w-full max-h-full object-contain" onerror="this.src='https://via.placeholder.com/300?text=LOGO'">
+                            </div>
+                            <label class="bg-white text-black px-6 py-3 rounded-corp font-bold cursor-pointer transition-all hover:bg-gray-200">
+                                ALTERAR LOGO
+                                <input type="file" class="hidden" accept="image/*" onchange="prepareCrop(this, 'logo')">
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-bold">Promoções</h3>
+                            <label class="bg-blue-600 px-6 py-3 rounded-corp font-bold cursor-pointer">
+                                ADICIONAR FOTO
+                                <input type="file" class="hidden" accept="image/*" onchange="prepareCrop(this, 'promo')">
+                            </label>
+                        </div>
+                        <div id="promo-list" class="grid grid-cols-3 gap-4"></div>
+                    </div>
+                </section>
+
+                <section id="tab-colors" class="hidden">
+                    <h2 class="text-3xl font-black mb-6">Cores do Template</h2>
+                    <form id="colors-form" class="space-y-8">
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">BG LISTAGEM (ESQUERDA)</label>
+                                <input type="color" name="bg_list" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">BG LATERAL (DIREITA)</label>
+                                <input type="color" name="bg_side" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">COR PRIMÁRIA (BG Totais)</label>
+                                <input type="color" name="primary" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">COR SECUNDÁRIA (Cabeçalho Tabela)</label>
+                                <input type="color" name="secondary" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">COR ACENTO (Bordas/Overlay)</label>
+                                <input type="color" name="accent" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">COR TEXTO GERAL</label>
+                                <input type="color" name="text" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-black text-gray-500">TEXTO DO TOTAL (R$)</label>
+                                <input type="color" name="text_total" class="w-full h-16 bg-transparent cursor-pointer">
+                            </div>
+                        </div>
+                        <button type="submit" class="bg-blue-600 px-10 py-4 rounded-corp font-black">SALVAR CORES</button>
+                    </form>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <div id="cropper-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-[#1e293b] rounded-corp overflow-hidden">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                <h3 class="text-xl font-black">Recortar Imagem</h3>
+                <button onclick="closeCropper()" class="text-gray-400">FECHAR</button>
+            </div>
+            <div class="p-8">
+                <div class="max-h-[500px] overflow-hidden rounded-corp bg-black mb-6">
+                    <img id="cropper-img" src="" class="max-w-full">
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button id="save-crop-btn" class="bg-blue-600 px-10 py-4 rounded-corp font-black text-xl">ENVIAR IMAGEM</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin-app.js"></script>
+</body>
+</html>

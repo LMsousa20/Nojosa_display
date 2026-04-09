@@ -3,116 +3,248 @@ const Firebird = require('node-firebird');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CONFIG_FILE = path.join(__dirname, 'config.json');
+const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
+const CONFIG_FILE = path.join(STORAGE_DIR, 'config.json');
+
+// Estado para detectar finalização de venda
+let lastKnownSale = { id: null, active: false };
+
+// MOCK_MODE: Defina como false para usar o banco de dados Firebird real
+const MOCK_MODE = false;
 
 app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+app.use(express.json({ limit: '10mb' }));
+// Serve arquivos enviados pelo usuário primeiro, depois faz fallback pros originais estáticos
+app.use(express.static(path.join(STORAGE_DIR, 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Helper para ler configuração
-function getDbConfig() {
-    if (fs.existsSync(CONFIG_FILE)) {
-        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+// Configuração do Multer para uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const type = req.params.type;
+        const dir = type === 'promo' ? path.join(STORAGE_DIR, 'public', 'promocoes') : path.join(STORAGE_DIR, 'public');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const type = req.params.type;
+        if (type === 'logo') {
+            cb(null, 'logo.png'); // Sobrescreve o logo atual
+        } else {
+            cb(null, `promo_${Date.now()}${path.extname(file.originalname)}`);
+        }
     }
-    return null;
-}
+});
+const upload = multer({ storage });
 
-// Rota para salvar configuração
-app.post('/api/config', (req, res) => {
-    const { host, database, user, password, port } = req.body;
-    const config = {
-        host: host || 'localhost',
-        port: parseInt(port) || 3050,
-        database: database,
-        user: user || 'SYSDBA',
-        password: password || 'masterkey',
-        lowercase_keys: true,
-        role: null,
-        pageSize: 4096
+// Helper para ler configurações
+function getConfig() {
+    const defaultConfig = {
+        db: {
+            host: 'localhost',
+            port: 3050,
+            database: '',
+            user: 'SYSDBA',
+            password: 'masterkey',
+            store_name: 'MINHA EMPRESA'
+        },
+        colors: {
+            primary: '#1e293b',
+            secondary: '#334155',
+            accent: '#3b82f6',
+            text: '#ffffff',
+            bg_app: '#020617',
+            bg_list: '#0f172a',
+            bg_side: '#020617',
+            text_total: '#ffffff'
+        }
     };
 
-    // Testa a conexão antes de salvar
-    Firebird.attach(config, (err, db) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Erro ao conectar: ' + err.message });
+    if (fs.existsSync(CONFIG_FILE)) {
+        try {
+            const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            console.log('[CONFIG] Carregando configurações do arquivo:', CONFIG_FILE);
+            
+            // Mescla configurações salvas com padrões para garantir que novos campos existam
+            return {
+                db: { ...defaultConfig.db, ...(saved.database ? {
+                    host: saved.host,
+                    port: saved.port,
+                    database: saved.database,
+                    user: saved.user,
+                    password: saved.password,
+                    store_name: saved.store_name
+                } : (saved.db || {})) },
+                colors: { ...defaultConfig.colors, ...(saved.colors || {}) }
+            };
+        } catch (e) {
+            console.error('[CONFIG] Erro ao analisar config.json:', e.message);
         }
-        db.detach();
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-        res.json({ success: true, message: 'Configuração salva e testada com sucesso!' });
-    });
-});
+    }
+    return defaultConfig;
+}
 
-// Rota para buscar venda atual
-app.get('/api/venda-atual', (req, res) => {
-    const config = getDbConfig();
-    if (!config) {
+// Rota de Status da Venda (Polling 1s)
+app.get('/api/status-venda', (req, res) => {
+    const settings = getConfig();
+
+    if (MOCK_MODE) {
+        console.log('[DEBUG] Mock Mode Ativo: Retornando dados simulados.');
+        return res.json({
+            success: true,
+            venda_ativa: true,
+            concluida: false,
+            total: 125.80,
+            itens: [
+                { cod_produto: 1, descricao: 'GASOLINA COMUM', quantidade: 20, valor_unitario: 5.89, subtotal: 117.80 },
+                { cod_produto: 2, descricao: 'ADITIVO STP', quantidade: 1, valor_unitario: 8.00, subtotal: 8.00 }
+            ]
+        });
+    }
+
+    if (!settings.db.database) {
         return res.status(400).json({ success: false, message: 'Banco de dados não configurado' });
     }
 
-    Firebird.attach(config, (err, db) => {
+    console.log(`[FIREBIRD] Tentando conexão: ${settings.db.host}:${settings.db.database}`);
+    const connectionOptions = { ...settings.db, lowercase_keys: true };
+    Firebird.attach(connectionOptions, (err, db) => {
         if (err) {
+            console.error('[FIREBIRD] Erro de Conexão:', err.message);
             return res.status(500).json({ success: false, message: 'Erro de conexão: ' + err.message });
         }
 
-        const query = `
+        const queryAtiva = `
             SELECT 
-                i.cod_produto, 
-                p.descricao, 
-                i.quantidade, 
-                i.valor_unitario, 
-                (i.quantidade * i.valor_unitario) as subtotal,
-                v.valor_total
-            FROM Venda v
-            INNER JOIN itens_vendas i ON v.sequencial = i.sequencial AND v.seq_caixa = i.seq_caixa
-            INNER JOIN Produtos p ON i.cod_produto = p.cod_produto
-            WHERE v.concluido = 'N' AND v.cancelada = 'N'
+                v.COD_PDV, v.SEQ_CAIXA, v.SEQUENCIAL,
+                i.COD_PRODUTO, p.DESCRICAO, i.QUANTIDADE, i.PRECO_NF as VALOR_UNITARIO, i.VALOR_NF as SUBTOTAL,
+                v.VALOR_NF as VALOR_TOTAL, i.CANCELADO
+            FROM VENDAS v
+            INNER JOIN ITENS_VENDA i ON v.COD_PDV = i.COD_PDV AND v.SEQ_CAIXA = i.SEQ_CAIXA AND v.SEQUENCIAL = i.SEQ_VENDA
+            INNER JOIN PRODUTOS p ON i.COD_PRODUTO = p.CODIGO
+            WHERE v.CONCLUIDA = 'N' AND v.CANCELADA = 'N'
+            ORDER BY i.NUMERO ASC
         `;
 
-        db.query(query, (err, result) => {
-            db.detach();
+        db.query(queryAtiva, (err, result) => {
             if (err) {
+                console.error('[QUERY] Erro na busca de venda ativa:', err.message);
+                db.detach();
                 return res.status(500).json({ success: false, message: 'Erro na query: ' + err.message });
             }
 
-            if (result.length === 0) {
-                return res.json({ success: true, venda_ativa: false });
+            if (result && result.length > 0) {
+                // Como lowercase_keys está true, usamos chaves minúsculas
+                const firstItem = result[0];
+                const saleId = `${firstItem.cod_pdv}|${firstItem.seq_caixa}|${firstItem.sequencial}`;
+                
+                console.log(`[VENDA] Ativa Detectada ID: ${saleId} (${result.length} itens)`);
+                console.log('[DEBUG] Primeiro item da venda:', JSON.stringify(firstItem));
+                
+                lastKnownSale = { id: saleId, active: true };
+                
+                // Calcula o total se não vier direto da venda
+                const totalVenda = firstItem.valor_total || result.reduce((acc, it) => acc + (it.subtotal || 0), 0);
+                
+                db.detach();
+                return res.json({
+                    success: true,
+                    venda_ativa: true,
+                    concluida: false,
+                    itens: result,
+                    total: totalVenda
+                });
             }
 
-            const totalVenda = result[0].valor_total || result.reduce((acc, item) => acc + item.subtotal, 0);
-            
-            res.json({ 
-                success: true, 
-                venda_ativa: true, 
-                itens: result,
-                total: totalVenda
-            });
+            // Se não há venda ativa, verifica se a última que conhecíamos foi concluída agora
+            if (lastKnownSale.active) {
+                const [pdv, caixa, seq] = lastKnownSale.id.split('|');
+                console.log(`[STATUS] Venda ${lastKnownSale.id} saiu do modo ativo. Verificando conclusão...`);
+                
+                const queryCheckConcluido = `SELECT CONCLUIDA FROM VENDAS WHERE COD_PDV = ? AND SEQ_CAIXA = ? AND SEQUENCIAL = ?`;
+                
+                db.query(queryCheckConcluido, [pdv, caixa, seq], (err, rows) => {
+                    db.detach();
+                    if (!err && rows && rows[0]) {
+                        // O retorno do campo também virá em minúsculo se lowercase_keys estiver true
+                        const status = rows[0].concluida;
+                        if (status === 'S') {
+                            console.log(`[CHECKOUT] Venda ${lastKnownSale.id} CONCLUÍDA com sucesso!`);
+                            lastKnownSale.active = false;
+                            return res.json({ success: true, venda_ativa: false, concluida: true });
+                        }
+                    }
+                    console.log(`[STATUS] Venda ${lastKnownSale.id} não consta como concluída 'S'.`);
+                    lastKnownSale.active = false;
+                    res.json({ success: true, venda_ativa: false, concluida: false });
+                });
+            } else {
+                db.detach();
+                res.json({ success: true, venda_ativa: false, concluida: false });
+            }
         });
     });
 });
 
-// Rota para listar promoções
-app.get('/api/promocoes', (req, res) => {
-    const promoDir = path.join(__dirname, 'public', 'promocoes');
-    if (!fs.existsSync(promoDir)) {
-        fs.mkdirSync(promoDir, { recursive: true });
-    }
+// Rotas de Configuração
+app.get('/api/settings', (req, res) => res.json({ success: true, settings: getConfig() }));
 
-    fs.readdir(promoDir, (err, files) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Erro ao ler pasta de promoções' });
+app.post('/api/settings', (req, res) => {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ success: true, message: 'Configurações salvas!' });
+});
+
+// Rotas de Upload
+app.post('/api/upload/:type', upload.single('image'), (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Arquivo ausente.' });
+    res.json({ success: true, message: 'Upload OK!', filename: req.file.filename });
+});
+
+app.delete('/api/promocoes/:filename', (req, res) => {
+    // Permite buscar imagem salva no user data ou no fallback base pra remoção (prioriza user data)
+    let filePath = path.join(STORAGE_DIR, 'public', 'promocoes', req.params.filename);
+    if (!fs.existsSync(filePath)) {
+        filePath = path.join(__dirname, 'public', 'promocoes', req.params.filename);
+    }
+    
+    if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch(e) {}
+        res.json({ success: true, message: 'Removido!' });
+    } else {
+        res.status(404).json({ success: false });
+    }
+});
+
+app.get('/api/promocoes', (req, res) => {
+    const promoDirBase = path.join(__dirname, 'public', 'promocoes');
+    const promoDirUser = path.join(STORAGE_DIR, 'public', 'promocoes');
+    
+    if (!fs.existsSync(promoDirBase)) fs.mkdirSync(promoDirBase, { recursive: true });
+    if (!fs.existsSync(promoDirUser)) fs.mkdirSync(promoDirUser, { recursive: true });
+    
+    let allFiles = new Set();
+    
+    try {
+        const baseFiles = fs.readdirSync(promoDirBase);
+        baseFiles.forEach(f => allFiles.add(f));
+    } catch(e) {}
+    
+    try {
+        if (promoDirBase !== promoDirUser) {
+            const userFiles = fs.readdirSync(promoDirUser);
+            userFiles.forEach(f => allFiles.add(f));
         }
-        
-        const images = files.filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file))
-                            .map(file => `/promocoes/${file}`);
-        
-        res.json({ success: true, images });
-    });
+    } catch(e) {}
+    
+    const images = Array.from(allFiles).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f)).map(f => `/promocoes/${f}`);
+    res.json({ success: true, images });
 });
 
 app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
+    console.log(`\nCFD CORPORATIVO RODANDO EM: http://localhost:${PORT}\n`);
 });
