@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Facing Display - PDV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .transition-opacity { transition: opacity 0.5s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-100 overflow-hidden h-screen">
+
+    <!-- Tela de Configuração -->
+    <div id="config-screen" class="hidden h-full flex items-center justify-center p-6">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Configuração do Banco</h2>
+            <form id="config-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600">Servidor (Host)</label>
+                    <input type="text" id="db-host" placeholder="localhost" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600">Caminho do Banco (.fdb)</label>
+                    <input type="text" id="db-path" placeholder="C:\ACS\DADOS.fdb" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-600">Usuário</label>
+                        <input type="text" id="db-user" placeholder="SYSDBA" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-600">Senha</label>
+                        <input type="password" id="db-pass" placeholder="masterkey" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    Salvar e Testar Conexão
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tela de Venda Ativa -->
+    <div id="sale-screen" class="hidden h-full grid grid-cols-12">
+        <!-- Lado Esquerdo: Itens -->
+        <div class="col-span-8 bg-white flex flex-col h-full shadow-lg">
+            <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
+                <h2 class="text-3xl font-extrabold text-blue-900">Itens da Compra</h2>
+                <span id="item-count" class="bg-blue-100 text-blue-800 px-4 py-1 rounded-full text-lg font-bold">0 itens</span>
+            </div>
+            <div id="items-list" class="flex-1 overflow-y-auto p-6 space-y-4">
+                <!-- Itens injetados via JS -->
+            </div>
+        </div>
+
+        <!-- Lado Direito: Logo e Total -->
+        <div class="col-span-4 bg-gradient-to-br from-blue-700 to-indigo-900 text-white flex flex-col h-full">
+            <div class="p-8 flex justify-center items-start flex-1">
+                <div id="logo-container" class="w-full h-48 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">
+                    <img src="/logo.png" alt="Logo" class="max-h-32 object-contain" onerror="this.src='https://via.placeholder.com/300x150?text=Sua+Logo+Aqui'">
+                </div>
+            </div>
+            <div class="p-8 bg-black/20 backdrop-blur-lg">
+                <p class="text-2xl font-semibold opacity-70 uppercase tracking-wider">Total a Pagar</p>
+                <div id="total-value" class="text-7xl font-black mt-2">R$ 0,00</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela de Promoções (Idle) -->
+    <div id="idle-screen" class="hidden h-full w-full relative bg-black">
+        <div id="promo-carousel" class="w-full h-full">
+            <!-- Imagens injetadas via JS -->
+        </div>
+        <div class="absolute bottom-10 left-0 right-0 flex justify-center space-x-2" id="carousel-indicators"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
