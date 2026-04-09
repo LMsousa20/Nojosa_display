@@ -5,17 +5,10 @@ const fs = require('fs');
 const userDataPath = app.getPath('userData');
 process.env.STORAGE_DIR = userDataPath;
 
-const configDest = path.join(userDataPath, 'config.json');
-if (!fs.existsSync(configDest)) {
-    const configSrc = path.join(__dirname, 'config.json');
-    if (fs.existsSync(configSrc)) {
-        try { fs.copyFileSync(configSrc, configDest); } catch(e) {}
-    }
-}
-
 require('./server.js');
 
 let tray = null;
+let adminWindow = null;
 
 function createWindow() {
     const displays = screen.getAllDisplays();
@@ -25,6 +18,7 @@ function createWindow() {
         width: 1280,
         height: 720,
         kiosk: true, 
+        fullscreen: true,
         alwaysOnTop: true,
         autoHideMenuBar: true,
         webPreferences: { nodeIntegration: false, contextIsolation: true }
@@ -38,6 +32,23 @@ function createWindow() {
     const mainWindow = new BrowserWindow(winOptions);
 
     globalShortcut.register('CommandOrControl+Q', () => app.quit());
+
+    globalShortcut.register('CommandOrControl+Space', () => {
+        if (adminWindow) {
+            if (adminWindow.isMinimized()) adminWindow.restore();
+            adminWindow.focus();
+            return;
+        }
+        
+        adminWindow = new BrowserWindow({
+            width: 1024,
+            height: 768,
+            autoHideMenuBar: true,
+            webPreferences: { nodeIntegration: false, contextIsolation: true }
+        });
+        adminWindow.loadURL('http://localhost:3000/admin.html');
+        adminWindow.on('closed', () => { adminWindow = null; });
+    });
 
     setTimeout(() => {
         mainWindow.loadURL('http://localhost:3000');

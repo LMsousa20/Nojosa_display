@@ -4,12 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
+const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STORAGE_DIR = process.env.STORAGE_DIR || __dirname;
-const CONFIG_FILE = path.join(STORAGE_DIR, 'config.json');
+const DB_FILE = path.join(STORAGE_DIR, 'settings.sqlite');
 
 // Estado para detectar finalização de venda
 let lastKnownSale = { id: null, active: false };
@@ -43,50 +44,39 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Helper para ler configurações
-function getConfig() {
-    const defaultConfig = {
-        db: {
-            host: 'localhost',
-            port: 3050,
-            database: '',
-            user: 'SYSDBA',
-            password: 'masterkey',
-            store_name: 'MINHA EMPRESA'
-        },
-        colors: {
-            primary: '#1e293b',
-            secondary: '#334155',
-            accent: '#3b82f6',
-            text: '#ffffff',
-            bg_app: '#020617',
-            bg_list: '#0f172a',
-            bg_side: '#020617',
-            text_total: '#ffffff'
-        }
-    };
+const dbSettings = new sqlite3.Database(DB_FILE);
 
-    if (fs.existsSync(CONFIG_FILE)) {
-        try {
-            const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-            console.log('[CONFIG] Carregando configurações do arquivo:', CONFIG_FILE);
-            
-            // Mescla configurações salvas com padrões para garantir que novos campos existam
-            return {
-                db: { ...defaultConfig.db, ...(saved.database ? {
-                    host: saved.host,
-                    port: saved.port,
-                    database: saved.database,
-                    user: saved.user,
-                    password: saved.password,
-                    store_name: saved.store_name
-                } : (saved.db || {})) },
-                colors: { ...defaultConfig.colors, ...(saved.colors || {}) }
-            };
-        } catch (e) {
-            console.error('[CONFIG] Erro ao analisar config.json:', e.message);
-        }
+let currentConfig = {
+    db: {
+        host: 'localhost', port: 3050, database: '', user: 'SYSDBA', password: 'masterkey', store_name: 'MINHA EMPRESA'
+    },
+    colors: {
+        primary: '#1e293b', secondary: '#334155', accent: '#3b82f6', text: '#ffffff', bg_app: '#020617', bg_list: '#0f172a', bg_side: '#020617', text_total: '#ffffff'
     }
-    return defaultConfig;
+};
+
+dbSettings.serialize(() => {
+    dbSettings.run(`CREATE TABLE IF NOT EXISTS app_config (id INTEGER PRIMARY KEY CHECK (id = 1), config_data TEXT)`);
+    dbSettings.get(`SELECT config_data FROM app_config WHERE id = 1`, (err, row) => {
+        if (row && row.config_data) {
+            try {
+                const saved = JSON.parse(row.config_data);
+                console.log('[CONFIG] Configurações carregadas do banco SQLite.');
+                currentConfig.db = { ...currentConfig.db, ...(saved.database ? {
+                    host: saved.host, port: saved.port, database: saved.database, user: saved.user, password: saved.password, store_name: saved.store_name
+                } : (saved.db || {})) };
+                currentConfig.colors = { ...currentConfig.colors, ...(saved.colors || {}) };
+            } catch (e) {
+                console.error('[CONFIG] Erro ao analisar config do SQLite:', e.message);
+            }
+        } else {
+            dbSettings.run(`INSERT INTO app_config (id, config_data) VALUES (1, ?)`, [JSON.stringify(currentConfig)]);
+        }
+    });
+});
+
+function getConfig() {
+    return currentConfig;
 }
 
 // Rota de Status da Venda (Polling 1s)
@@ -195,8 +185,19 @@ app.get('/api/status-venda', (req, res) => {
 app.get('/api/settings', (req, res) => res.json({ success: true, settings: getConfig() }));
 
 app.post('/api/settings', (req, res) => {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(req.body, null, 2));
-    res.json({ success: true, message: 'Configurações salvas!' });
+    const newConfig = req.body;
+    
+    currentConfig.db = { ...currentConfig.db, ...(newConfig.db || {}) };
+    currentConfig.colors = { ...currentConfig.colors, ...(newConfig.colors || {}) };
+
+    dbSettings.run(
+        `REPLACE INTO app_config (id, config_data) VALUES (1, ?)`,
+        [JSON.stringify(currentConfig)],
+        (err) => {
+            if (err) return res.status(500).json({ success: false, message: 'Erro ao salvar no banco.' });
+            res.json({ success: true, message: 'Configurações salvas com sucesso no banco!' });
+        }
+    );
 });
 
 // Rotas de Upload
