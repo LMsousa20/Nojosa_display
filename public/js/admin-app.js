@@ -46,6 +46,38 @@ document.getElementById('colors-form').addEventListener('submit', async (e) => {
     await saveSettings();
 });
 
+// Listener para formulário de avaliação e evento de mudança de tipo
+const avaliacaoConfigForm = document.getElementById('avaliacao-config-form');
+if (avaliacaoConfigForm) {
+    avaliacaoConfigForm.addEventListener('submit', saveAvaliacaoConfig);
+}
+
+const configTipo = document.getElementById('config-tipo');
+if (configTipo) {
+    configTipo.addEventListener('change', (e) => {
+        const container = document.getElementById('url-qr-container');
+        const urlInput = document.getElementById('config-url-qr');
+        
+        if (e.target.value === 'QRCODE') {
+            container.classList.remove('hidden');
+            if (urlInput.value) {
+                generateQRCodePreview(urlInput.value);
+            }
+        } else {
+            container.classList.add('hidden');
+        }
+    });
+}
+
+const urlQRInput = document.getElementById('config-url-qr');
+if (urlQRInput) {
+    urlQRInput.addEventListener('input', (e) => {
+        if (e.target.value) {
+            generateQRCodePreview(e.target.value);
+        }
+    });
+}
+
 async function saveSettings() {
     const res = await fetch('/api/settings', {
         method: 'POST',
@@ -112,6 +144,176 @@ function switchTab(tab) {
         b.classList.add('tab-inactive');
     });
     document.getElementById(`btn-${tab}`).classList.replace('tab-inactive', 'tab-active');
+    
+    // Carregar avaliações ao abrir a aba
+    if (tab === 'avaliacoes') {
+        loadAvaliacoes();
+        loadAvaliacaoConfig();
+    }
+}
+
+// ====== FUNÇÕES DE AVALIAÇÃO ======
+async function loadAvaliacaoConfig() {
+    try {
+        const res = await fetch('/api/avaliacao-config');
+        const data = await res.json();
+        if (data.success && data.config) {
+            const config = data.config;
+            document.getElementById('config-ativa').value = config.ativa ? 'true' : 'false';
+            document.getElementById('config-tipo').value = config.tipo || 'ESTRELA';
+            document.getElementById('config-url-qr').value = config.url_qr_code || '';
+            
+            // Mostrar/ocultar campo de URL baseado no tipo
+            if (config.tipo === 'QRCODE') {
+                document.getElementById('url-qr-container').classList.remove('hidden');
+                if (config.url_qr_code) generateQRCodePreview(config.url_qr_code);
+            } else {
+                document.getElementById('url-qr-container').classList.add('hidden');
+            }
+        }
+    } catch (err) {
+        console.error('Erro ao carregar configuração:', err);
+    }
+}
+
+async function saveAvaliacaoConfig(e) {
+    e.preventDefault();
+    const ativa = document.getElementById('config-ativa').value === 'true';
+    const tipo = document.getElementById('config-tipo').value;
+    const url_qr_code = document.getElementById('config-url-qr').value;
+
+    const res = await fetch('/api/avaliacao-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativa, tipo, url_qr_code })
+    });
+
+    if (res.ok) {
+        alert('Configuração de avaliação salva!');
+    }
+}
+
+function generateQRCodePreview(url) {
+    const container = document.getElementById('qr-preview');
+    container.innerHTML = '';
+    if (!url) return;
+    
+    new QRCode(container, {
+        text: url,
+        width: 128,
+        height: 128,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+}
+
+async function loadAvaliacoes() {
+    const dataInicio = document.getElementById('filter-data-inicio').value;
+    const dataFim = document.getElementById('filter-data-fim').value;
+    const operadorId = document.getElementById('filter-operador').value;
+
+    const params = new URLSearchParams();
+    if (dataInicio) params.append('dataInicio', dataInicio);
+    if (dataFim) params.append('dataFim', dataFim);
+    if (operadorId) params.append('operadorId', operadorId);
+
+    try {
+        const res = await fetch(`/api/avaliacoes?${params}`);
+        const data = await res.json();
+        
+        const list = document.getElementById('avaliacoes-list');
+        if (!data.success || !data.avaliacoes || data.avaliacoes.length === 0) {
+            list.innerHTML = '<p class="text-gray-500">Nenhuma avaliação encontrada</p>';
+            return;
+        }
+
+        list.innerHTML = data.avaliacoes.map(av => `
+            <div class="p-3 bg-black/40 rounded-corp border border-white/10 flex justify-between items-center">
+                <div>
+                    <p class="text-white font-bold">Venda: ${av.venda_id}</p>
+                    <p class="text-gray-400 text-sm">Op: ${av.operador_id} | Caixa: ${av.caixa_id}</p>
+                    <p class="text-gray-300 text-xs">${av.data} ${av.hora}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-yellow-400 font-bold">${av.tipo}</p>
+                    ${av.nota ? `<p class="text-white">⭐ ${av.nota}/5</p>` : '<p class="text-gray-500">-</p>'}
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Erro ao carregar avaliações:', err);
+        document.getElementById('avaliacoes-list').innerHTML = '<p class="text-red-500">Erro ao carregar</p>';
+    }
+}
+
+function openQRModal() {
+    const urlQR = document.getElementById('config-url-qr').value;
+    if (!urlQR) {
+        alert('Configure uma URL para o QR Code primeiro');
+        return;
+    }
+    
+    const container = document.getElementById('qr-modal-display');
+    container.innerHTML = '';
+    new QRCode(container, {
+        text: urlQR,
+        width: 400,
+        height: 400,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    document.getElementById('qr-modal').classList.remove('hidden');
+}
+
+function closeQRModal() {
+    document.getElementById('qr-modal').classList.add('hidden');
+}
+
+async function exportAvaliacoesCSV() {
+    try {
+        const res = await fetch('/api/avaliacoes');
+        const data = await res.json();
+        
+        if (!data.success || !data.avaliacoes || data.avaliacoes.length === 0) {
+            alert('Nenhuma avaliação para exportar');
+            return;
+        }
+
+        // Preparar cabeçalho CSV
+        const headers = ['ID Venda', 'Caixa', 'Operador', 'Nota', 'Tipo', 'Data', 'Hora'];
+        const rows = data.avaliacoes.map(av => [
+            av.venda_id,
+            av.caixa_id,
+            av.operador_id,
+            av.nota || '-',
+            av.tipo,
+            av.data,
+            av.hora
+        ]);
+
+        // Criar CSV
+        let csv = headers.join(',') + '\n';
+        rows.forEach(row => {
+            csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+        });
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `avaliacoes_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        console.error('Erro ao exportar CSV:', err);
+        alert('Erro ao exportar avaliações');
+    }
 }
 
 init();
@@ -119,3 +321,16 @@ window.switchTab = switchTab;
 window.prepareCrop = prepareCrop;
 window.deletePromo = deletePromo;
 window.closeCropper = closeCropper;
+window.loadAvaliacoes = loadAvaliacoes;
+window.saveAvaliacaoConfig = saveAvaliacaoConfig;
+window.openOrRefreshDisplay = function() {
+    // Tenta abrir ou focar a janela existente do display
+    const displayWindow = window.open('/', 'display-window', 'width=1920,height=1080');
+    if (displayWindow) {
+        displayWindow.location.reload();
+        displayWindow.focus();
+    }
+};
+window.openQRModal = openQRModal;
+window.closeQRModal = closeQRModal;
+window.exportAvaliacoesCSV = exportAvaliacoesCSV;

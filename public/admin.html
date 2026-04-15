@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
@@ -24,22 +25,22 @@
                 <h1 class="text-4xl font-black tracking-tight">Painel Administrativo</h1>
                 <p class="text-gray-400 font-medium">Customer Facing Display - Configurações Gerais</p>
             </div>
-            <a href="/" target="_blank" class="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-corp font-bold transition-all flex items-center gap-2">
-                VER DISPlAY
+            <a href="javascript:void(0)" onclick="openOrRefreshDisplay()" class="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-corp font-bold transition-all flex items-center gap-2">
+                VER DISPLAY
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 v-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
             </a>
         </header>
 
-        <div class="grid grid-cols-12 gap-8">
-            <nav class="col-span-12 md:col-span-3 space-y-2">
-                <button onclick="switchTab('db')" id="btn-db" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-active">BANCO DE DADOS</button>
-                <button onclick="switchTab('images')" id="btn-images" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-inactive">IMAGENS (LOGO/PROMO)</button>
-                <button onclick="switchTab('colors')" id="btn-colors" class="w-full text-left p-4 rounded-corp font-bold transition-all tab-inactive">IDENTIDADE VISUAL</button>
-            </nav>
+        <nav class="flex gap-2 mb-8 overflow-x-auto flex-wrap">
+            <button onclick="switchTab('db')" id="btn-db" class="px-6 py-3 rounded-corp font-bold transition-all tab-active whitespace-nowrap">BANCO DE DADOS</button>
+            <button onclick="switchTab('images')" id="btn-images" class="px-6 py-3 rounded-corp font-bold transition-all tab-inactive whitespace-nowrap">IMAGENS (LOGO/PROMO)</button>
+            <button onclick="switchTab('colors')" id="btn-colors" class="px-6 py-3 rounded-corp font-bold transition-all tab-inactive whitespace-nowrap">IDENTIDADE VISUAL</button>
+            <button onclick="switchTab('avaliacoes')" id="btn-avaliacoes" class="px-6 py-3 rounded-corp font-bold transition-all tab-inactive whitespace-nowrap">AVALIAÇÕES</button>
+        </nav>
 
-            <main class="col-span-12 md:col-span-9 glass rounded-corp p-8 md:p-12 relative min-h-[600px]">
+        <main class="glass rounded-corp p-8 md:p-12 relative min-h-[600px]">
                 
                 <section id="tab-db">
                     <h2 class="text-3xl font-black mb-6">Configuração Geral</h2>
@@ -139,7 +140,67 @@
                     </form>
                 </section>
 
+                <section id="tab-avaliacoes" class="hidden">
+                    <h2 class="text-3xl font-black mb-8">Sistema de Avaliações</h2>
+                    
+                    <div class="p-6 border border-white/10 bg-white/5 rounded-corp mb-8">
+                        <h3 class="text-xl font-bold mb-6">Configuração</h3>
+                        <form id="avaliacao-config-form" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <label class="text-xs font-black uppercase text-gray-500">Status</label>
+                                    <select id="config-ativa" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                                        <option value="false">Desativada</option>
+                                        <option value="true">Ativada</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs font-black uppercase text-gray-500">Tipo de Avaliação</label>
+                                    <select id="config-tipo" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500">
+                                        <option value="ESTRELA">Estrelas (1-5)</option>
+                                        <option value="QRCODE">QR Code</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="url-qr-container" class="space-y-2 hidden">
+                                <label class="text-xs font-black uppercase text-gray-500">URL para QR Code</label>
+                                <input type="url" id="config-url-qr" class="w-full bg-black/40 border border-white/10 p-4 rounded-corp outline-none focus:border-blue-500" placeholder="https://seusite.com/avaliar">
+                                <div class="flex gap-4 items-end">
+                                    <div id="qr-preview" class="mt-4 p-4 bg-white rounded-corp w-32 h-32 flex items-center justify-center"></div>
+                                    <button type="button" onclick="openQRModal()" class="bg-purple-600 hover:bg-purple-500 px-6 py-3 rounded-corp font-bold whitespace-nowrap">VER QR</button>
+                                </div>
+                            </div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-corp font-black">SALVAR CONFIGURAÇÃO</button>
+                        </form>
+                    </div>
+
+                    <div class="p-6 border border-white/10 bg-white/5 rounded-corp">
+                        <h3 class="text-xl font-bold mb-6">Avaliações Realizadas</h3>
+                        <div class="flex gap-4 mb-6 flex-wrap">
+                            <input type="date" id="filter-data-inicio" class="bg-black/40 border border-white/10 p-3 rounded-corp outline-none focus:border-blue-500" placeholder="Data inicial">
+                            <input type="date" id="filter-data-fim" class="bg-black/40 border border-white/10 p-3 rounded-corp outline-none focus:border-blue-500" placeholder="Data final">
+                            <input type="number" id="filter-operador" class="bg-black/40 border border-white/10 p-3 rounded-corp outline-none focus:border-blue-500" placeholder="ID Operador">
+                            <button onclick="loadAvaliacoes()" class="bg-green-600 hover:bg-green-500 px-6 py-3 rounded-corp font-bold">FILTRAR</button>
+                            <button onclick="exportAvaliacoesCSV()" class="bg-cyan-600 hover:bg-cyan-500 px-6 py-3 rounded-corp font-bold">EXPORTAR CSV</button>
+                        </div>
+                        <div id="avaliacoes-list" class="space-y-2 max-h-96 overflow-y-auto">
+                            <p class="text-gray-500">Carregando...</p>
+                        </div>
+                    </div>
+                </section>
             </main>
+        </div>
+    </div>
+
+    <div id="qr-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-[#1e293b] rounded-corp overflow-hidden">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                <h3 class="text-xl font-black">QR Code para Avaliação</h3>
+                <button onclick="closeQRModal()" class="text-gray-400 hover:text-white font-bold">FECHAR</button>
+            </div>
+            <div class="p-8 flex justify-center">
+                <div id="qr-modal-display" class="bg-white p-8 rounded-corp"></div>
+            </div>
         </div>
     </div>
 

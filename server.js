@@ -91,8 +91,8 @@ app.get('/api/status-venda', (req, res) => {
             concluida: false,
             total: 125.80,
             itens: [
-                { cod_produto: 1, descricao: 'GASOLINA COMUM', quantidade: 20, valor_unitario: 5.89, subtotal: 117.80 },
-                { cod_produto: 2, descricao: 'ADITIVO STP', quantidade: 1, valor_unitario: 8.00, subtotal: 8.00 }
+                { cod_produto: 1, descricao: 'GASOLINA COMUM', quantidade: 20, valor_unitario: 5.89, subtotal: 117.80, operadora: 'JOÃO SILVA' },
+                { cod_produto: 2, descricao: 'ADITIVO STP', quantidade: 1, valor_unitario: 8.00, subtotal: 8.00, operadora: 'JOÃO SILVA' }
             ]
         });
     }
@@ -111,12 +111,13 @@ app.get('/api/status-venda', (req, res) => {
 
         const queryAtiva = `
             SELECT 
-                v.COD_PDV, v.SEQ_CAIXA, v.SEQUENCIAL,
+                v.COD_PDV, v.SEQ_CAIXA, v.SEQUENCIAL, v.COD_OPERADOR,
                 i.COD_PRODUTO, p.DESCRICAO, i.QUANTIDADE, i.PRECO_NF as VALOR_UNITARIO, i.VALOR_NF as SUBTOTAL,
-                v.VALOR_NF as VALOR_TOTAL, i.CANCELADO
+                v.VALOR_NF as VALOR_TOTAL, i.CANCELADO, f.APELIDO as OPERADORA
             FROM VENDAS v
             INNER JOIN ITENS_VENDA i ON v.COD_PDV = i.COD_PDV AND v.SEQ_CAIXA = i.SEQ_CAIXA AND v.SEQUENCIAL = i.SEQ_VENDA
             INNER JOIN PRODUTOS p ON i.COD_PRODUTO = p.CODIGO
+            INNER JOIN FUNCIONARIOS f ON f.CODIGO = v.COD_OPERADOR
             WHERE v.CONCLUIDA = 'N' AND v.CANCELADA = 'N'
             ORDER BY i.NUMERO ASC
         `;
@@ -146,6 +147,7 @@ app.get('/api/status-venda', (req, res) => {
                     success: true,
                     venda_ativa: true,
                     concluida: false,
+                    venda_id: saleId,
                     itens: result,
                     total: totalVenda
                 });
@@ -176,6 +178,36 @@ app.get('/api/status-venda', (req, res) => {
             } else {
                 db.detach();
                 res.json({ success: true, venda_ativa: false, concluida: false });
+            }
+        });
+    });
+});
+
+// Inicializar tabela de avaliações (SQLite)
+dbSettings.serialize(() => {
+    dbSettings.run(`
+        CREATE TABLE IF NOT EXISTS avaliacao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            venda_id TEXT NOT NULL,
+            caixa_id INTEGER,
+            operador_id INTEGER,
+            nota INTEGER,
+            tipo TEXT DEFAULT 'ESTRELA',
+            data TEXT,
+            hora TEXT,
+            UNIQUE(venda_id)
+        )
+    `);
+    dbSettings.run(`CREATE TABLE IF NOT EXISTS avaliacao_config (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        ativa BOOLEAN DEFAULT 0,
+        tipo TEXT DEFAULT 'ESTRELA',
+        url_qr_code TEXT
+    )`, () => {
+        // Se não existir config, criar padrão
+        dbSettings.get(`SELECT * FROM avaliacao_config WHERE id = 1`, (err, row) => {
+            if (!row) {
+                dbSettings.run(`INSERT INTO avaliacao_config (id, ativa, tipo) VALUES (1, 0, 'ESTRELA')`);
             }
         });
     });
@@ -244,6 +276,68 @@ app.get('/api/promocoes', (req, res) => {
     
     const images = Array.from(allFiles).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f)).map(f => `/promocoes/${f}`);
     res.json({ success: true, images });
+});
+
+// ====== ROTAS DE AVALIAÇÃO ======
+app.get('/api/avaliacao-config', (req, res) => {
+    dbSettings.get(`SELECT * FROM avaliacao_config WHERE id = 1`, (err, row) => {
+        if (err || !row) return res.json({ success: false });
+        res.json({ success: true, config: row });
+    });
+});
+
+app.post('/api/avaliacao-config', (req, res) => {
+    const { ativa, tipo, url_qr_code } = req.body;
+    dbSettings.run(
+        `UPDATE avaliacao_config SET ativa = ?, tipo = ?, url_qr_code = ? WHERE id = 1`,
+        [ativa ? 1 : 0, tipo, url_qr_code || null],
+        (err) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, message: 'Configuração salva!' });
+        }
+    );
+});
+
+app.post('/api/avaliacao', (req, res) => {
+    const { venda_id, caixa_id, operador_id, nota, tipo } = req.body;
+    const agora = new Date();
+    const data = agora.toISOString().split('T')[0];
+    const hora = agora.toTimeString().split(' ')[0];
+
+    dbSettings.run(
+        `INSERT OR IGNORE INTO avaliacao (venda_id, caixa_id, operador_id, nota, tipo, data, hora) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [venda_id, caixa_id, operador_id, nota || null, tipo, data, hora],
+        (err) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, message: 'Avaliação salva!' });
+        }
+    );
+});
+
+app.get('/api/avaliacoes', (req, res) => {
+    const { dataInicio, dataFim, operadorId } = req.query;
+    let query = `SELECT * FROM avaliacao WHERE 1=1`;
+    const params = [];
+
+    if (dataInicio) {
+        query += ` AND data >= ?`;
+        params.push(dataInicio);
+    }
+    if (dataFim) {
+        query += ` AND data <= ?`;
+        params.push(dataFim);
+    }
+    if (operadorId) {
+        query += ` AND operador_id = ?`;
+        params.push(operadorId);
+    }
+
+    query += ` ORDER BY data DESC, hora DESC`;
+
+    dbSettings.all(query, params, (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true, avaliacoes: rows || [] });
+    });
 });
 
 app.listen(PORT, () => {

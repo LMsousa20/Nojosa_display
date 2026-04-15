@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css?v=1.1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         .carousel-img {
             transition: opacity 1s ease-in-out;
@@ -40,19 +41,24 @@
         </div>
 
         <!-- Lado Direito: Logo e Total -->
-        <div class="col-span-4 flex flex-col h-full overflow-hidden bg-side-custom p-8 justify-between">
+        <div class="col-span-4 flex flex-col h-full overflow-hidden bg-side-custom justify-between">
             <div class="flex flex-col items-center">
-                <div class="w-full h-80 flex items-center justify-center bg-white/5 rounded-md p-3 mb-5">
+                <div class="w-full max-h-1/2 flex items-center justify-center bg-white/5 rounded-md mb-5">
                     <img id="logo-img" src="/logo.png" class="max-w-full max-h-full "
                         onerror="this.src='https://via.placeholder.com/300?text=LOGO'">
                 </div>
+                <p id="store-name" class="text-accent-custom text-2xl font-black uppercase mb-1">---</p>
                 <div class="text-center w-full border-t border-slate-800 pt-3">
-                    <p id="store-name" class="text-accent-custom text-2xl font-black uppercase mb-1">---</p>
 
+                </div>
+                 <p class="text-gray-400 font-bold uppercase text-lg tracking-widest mb-2">OPERADOR</p>
+                <div id="operadora-nome" class="text-2xl font-black text-accent-custom uppercase mb-6 truncate">
+                    ---
                 </div>
             </div>
 
             <div class="bg-primary-custom rounded-md p-8 border border-white/10 shadow-2xl">
+               
                 <p class="text-gray-400 font-bold uppercase text-lg tracking-widest mb-4">Total a Pagar</p>
                 <div id="total-venda"
                     class="text-6xl lg:text-7xl font-[900] text-total-custom tracking-tighter truncate">
@@ -64,12 +70,34 @@
 
     <!-- Tela de Agradecimento (Modal/Overlay) -->
     <div id="screen-obrigado" class="screen hidden flex items-center justify-center z-50 bg-slate-950/95">
-        <div class="text-center space-y-8 animate-pulse">
-            <div class="inline-block p-10 rounded-md border-4 border-accent-custom bg-accent-custom/5">
+        <div class="text-center space-y-8">
+            <!-- Parte de agradecimento -->
+            <div id="thanks-section" class="inline-block p-10 rounded-md border-4 border-accent-custom bg-accent-custom/5 animate-pulse">
                 <h1 class="text-8xl font-black text-white px-20">OBRIGADO!</h1>
                 <p class="text-3xl text-accent-custom font-bold uppercase mt-6 tracking-[0.4em]">Pela preferência</p>
             </div>
             <p class="text-slate-500 text-xl font-medium italic">Seu atendimento foi concluído com sucesso.</p>
+
+            <!-- Seção de Avaliação (mostrada depois) -->
+            <div id="avaliacao-section" class="hidden space-y-6">
+                <!-- Avaliação por Estrelas -->
+                <div id="avaliacao-estrelas" class="hidden">
+                    <p class="text-white text-5xl font-black mb-8">Como foi sua experiência?</p>
+                    <div class="flex justify-center gap-6">
+                        <button onclick="rateEstrela(1)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(2)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(3)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(4)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(5)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                    </div>
+                </div>
+
+                <!-- Avaliação por QR Code -->
+                <div id="avaliacao-qrcode" class="hidden">
+                    <p class="text-white text-5xl font-black mb-8">Escaneie para avaliar</p>
+                    <div id="qrcode-display" class="bg-white p-6 rounded-md inline-block"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -94,10 +122,13 @@
     </div>
 
     <!-- Botão Secreto para Configurações (Fica semi-transparente no canto) -->
-    <a href="/admin.html" class="fixed bottom-4 right-4 text-white/5 hover:text-white/80 transition-all z-[100]" title="Abrir Configurações">
+    <a href="/admin.html" target="_blank" class="fixed bottom-4 right-4 text-white/5 hover:text-white/80 transition-all z-[100]"
+        title="Abrir Configurações">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
     </a>
 

@@ -4,6 +4,8 @@ let currentPromoIndex = 0;
 let carouselInterval = null;
 let lastItemsCount = 0;
 let thankYouTimer = null;
+let avaliacaoConfig = null;
+let currentSaleData = { cod_pdv: null, seq_caixa: null, sequencial: null, cod_operador: null };
 
 // Configurações de cores via Root
 function applyColors(colors) {
@@ -34,6 +36,24 @@ function showScreen(screenId) {
 
     currentState = screenId;
 
+    // Resetar tela de obrigado quando sair dela
+    if (screenId !== 'obrigado') {
+        document.getElementById('thanks-section').classList.remove('hidden');
+        document.getElementById('avaliacao-section').classList.add('hidden');
+        document.getElementById('avaliacao-estrelas').classList.add('hidden');
+        document.getElementById('avaliacao-qrcode').classList.add('hidden');
+        document.getElementById('avaliacao-estrelas').innerHTML = `
+            <p class="text-white text-5xl font-black mb-8">Como foi sua experiência?</p>
+            <div class="flex justify-center gap-6">
+                <button onclick="rateEstrela(1)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                <button onclick="rateEstrela(2)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                <button onclick="rateEstrela(3)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                <button onclick="rateEstrela(4)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                <button onclick="rateEstrela(5)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+            </div>
+        `;
+    }
+
     if (screenId === 'standby') startCarousel();
     else stopCarousel();
 }
@@ -50,7 +70,21 @@ async function pollStatus() {
         }
 
         if (data.venda_ativa) {
-            renderVendaAtiva(data.itens, data.total);
+            // Extrai o nome da operadora do primeiro item (todos têm o mesmo)
+            const operadora = data.itens && data.itens.length > 0 ? data.itens[0].operadora : null;
+            
+            // Armazenar dados da venda para avaliação
+            if (data.itens && data.itens.length > 0) {
+                // Dados virão do backend - as chaves vêm em minúsculo por causa de lowercase_keys
+                currentSaleData = {
+                    cod_pdv: data.venda_id?.split('|')[0] || null,
+                    seq_caixa: data.venda_id?.split('|')[1] || null,
+                    sequencial: data.venda_id?.split('|')[2] || null,
+                    cod_operador: data.itens[0].cod_operador || null
+                };
+            }
+            
+            renderVendaAtiva(data.itens, data.total, operadora);
             showScreen('venda');
         } else if (data.concluida) {
             triggerThankYou();
@@ -65,11 +99,19 @@ async function pollStatus() {
 }
 
 // Lógica de Venda
-function renderVendaAtiva(itens, total) {
+function renderVendaAtiva(itens, total, operadora) {
     const list = document.getElementById('items-list');
     const totalEl = document.getElementById('total-venda');
+    const operadoraEl = document.getElementById('operadora-nome');
 
     if (itens.length === 0) return;
+
+    // Exibir operadora uma única vez
+    if (operadora) {
+        operadoraEl.innerText = operadora;
+    } else {
+        operadoraEl.innerText = '---';
+    }
 
     // Criar uma assinatura do estado atual para detectar mudanças instantâneas (incluindo cancelados)
     const currentStateSignature = JSON.stringify(itens);
@@ -107,11 +149,38 @@ function triggerThankYou() {
     lastItemsCount = 0; // Reset para próxima venda
 
     if (thankYouTimer) clearTimeout(thankYouTimer);
-    thankYouTimer = setTimeout(() => {
-        currentState = 'transition'; // Estado temporário para permitir troca
-        showScreen('standby');
-        pollStatus(); // Verifica status imediatamente
-    }, 5000);
+    
+    // Mostrar avaliação se ativada
+    if (avaliacaoConfig && avaliacaoConfig.ativa) {
+        // Esperar 3 segundos antes de mostrar avaliação
+        setTimeout(() => {
+            document.getElementById('thanks-section').classList.add('hidden');
+            document.getElementById('avaliacao-section').classList.remove('hidden');
+            
+            if (avaliacaoConfig.tipo === 'ESTRELA') {
+                document.getElementById('avaliacao-estrelas').classList.remove('hidden');
+                document.getElementById('avaliacao-qrcode').classList.add('hidden');
+            } else if (avaliacaoConfig.tipo === 'QRCODE') {
+                document.getElementById('avaliacao-estrelas').classList.add('hidden');
+                document.getElementById('avaliacao-qrcode').classList.remove('hidden');
+                displayQRCode(avaliacaoConfig.url_qr_code);
+            }
+        }, 5000);
+        
+        // Total de 10 segundos (3 de agradecimento + 7 de avaliação)
+        thankYouTimer = setTimeout(() => {
+            currentState = 'transition';
+            showScreen('standby');
+            pollStatus();
+        }, 30000);
+    } else {
+        // Apenas 5 segundos se avaliação desativada
+        thankYouTimer = setTimeout(() => {
+            currentState = 'transition';
+            showScreen('standby');
+            pollStatus();
+        }, 5000);
+    }
 }
 
 // Carrossel
@@ -166,6 +235,69 @@ async function loadSettings() {
     }
 }
 
+async function loadAvaliacaoConfig() {
+    try {
+        const res = await fetch('/api/avaliacao-config');
+        const data = await res.json();
+        if (data.success) {
+            avaliacaoConfig = data.config;
+        }
+    } catch (err) {
+        console.error('Erro ao carregar configuração de avaliação:', err);
+    }
+}
+
+function displayQRCode(url) {
+    const container = document.getElementById('qrcode-display');
+    container.innerHTML = '';
+    if (!url) return;
+    
+    new QRCode(container, {
+        text: url,
+        width: 256,
+        height: 256,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+}
+
+async function rateEstrela(nota) {
+    // Desabilitar cliques enquanto salva
+    document.querySelectorAll('#avaliacao-estrelas button').forEach(b => b.disabled = true);
+    
+    try {
+        const res = await fetch('/api/avaliacao', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                venda_id: `${currentSaleData.cod_pdv}|${currentSaleData.seq_caixa}|${currentSaleData.sequencial}`,
+                caixa_id: currentSaleData.seq_caixa,
+                operador_id: currentSaleData.cod_operador,
+                nota: nota,
+                tipo: 'ESTRELA'
+            })
+        });
+
+        if (res.ok) {
+            // Mostrar feedback visual
+            const section = document.getElementById('avaliacao-estrelas');
+            section.innerHTML = '<p class="text-green-400 text-2xl font-bold">✓ Avaliação salva!</p>';
+            
+            // Voltar ao standby em 2 segundos
+            setTimeout(() => {
+                clearTimeout(thankYouTimer);
+                currentState = 'transition';
+                showScreen('standby');
+                pollStatus();
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('Erro ao salvar avaliação:', err);
+        alert('Erro ao salvar avaliação');
+    }
+}
+
 function formatCurrency(v) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
@@ -196,6 +328,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
 document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
     await loadPromocoes();
+    await loadAvaliacaoConfig();
     pollStatus();
     setInterval(pollStatus, 1000);
 });

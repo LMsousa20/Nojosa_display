@@ -6,9 +6,13 @@
   "scripts": {
     "start": "node server.js",
     "dev:electron": "electron .",
-    "build": "electron-packager . \"CFD PDV\" --platform=win32 --arch=x64 --out=dist_final --overwrite --asar --extra-resource=config.json"
+    "build": "electron-packager . \"CFD PDV\" --platform=win32 --arch=x64 --out=dist_final --overwrite --asar --extra-resource=config.json",
+    "build:apk": "npx capacitor copy android && cd android && gradlew assembleRelease && cd .."
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",

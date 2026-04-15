@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Facing Display - PDV</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=1.1">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        .carousel-img {
+            transition: opacity 1s ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950">
+
+
+    <!-- Tela de Agradecimento (Modal/Overlay) -->
+    <div id="screen-obrigado" class="screen flex items-center justify-center z-50 bg-slate-950/95">
+        <div class="text-center space-y-8">
+            <!-- Parte de agradecimento -->
+            <div id="thanks-section" class="inline-block hidden p-10 rounded-md border-4 border-accent-custom bg-accent-custom/5 animate-pulse">
+                <h1 class="text-8xl font-black text-white px-20">OBRIGADO!</h1>
+                <p class="text-3xl text-accent-custom font-bold uppercase mt-6 tracking-[0.4em]">Pela preferência</p>
+            </div>
+            <p class="text-slate-500 text-3xl font-medium italic">Seu atendimento foi concluído com sucesso.</p>
+
+            <!-- Seção de Avaliação (mostrada depois) -->
+            <div id="avaliacao-section" class="space-y-6">
+                <!-- Avaliação por Estrelas -->
+                <div id="avaliacao-estrelas">
+                    <p class="text-white text-7xl font-black mb-8">Como foi sua experiência?</p>
+                    <div class="flex justify-center gap-6">
+                        <button onclick="rateEstrela(1)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(2)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(3)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(4)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                        <button onclick="rateEstrela(5)" class="text-9xl transition-all hover:scale-125 cursor-pointer">⭐</button>
+                    </div>
+                </div>
+
+                <!-- Avaliação por QR Code -->
+                <div id="avaliacao-qrcode" class="hidden">
+                    <p class="text-white text-5xl font-black mb-8">Escaneie para avaliar</p>
+                    <div id="qrcode-display" class="bg-white p-6 rounded-md inline-block"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js?v=1.2"></script>
+</body>
+
+</html>

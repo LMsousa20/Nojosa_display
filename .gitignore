@@ -2,3 +2,8 @@ dist
 dist_novo
 dist_final
 node_modules
+android
+setup-android.bat
+settings.sqlite
+setup-android.bat
+config.json
